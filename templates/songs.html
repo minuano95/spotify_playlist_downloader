@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <table>
+        <tr>
+            <th style="text-align:center">Song</th>
+            <th>|</th>
+            <th style="text-align:center">Artist</th>
+        </tr>
+        {% for song in songs_names_and_artists %}
+        <tr>
+            <td style="text-align:center">    
+                {{ song['song'] }} 
+            </td>
+            <td>|</td>
+            <td style="text-align:center">
+                {{song['artist']}}
+            </td>
+        </tr>
+        {% endfor %}
+
+    </table>
+</body>
+</html>

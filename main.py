@@ -18,17 +18,16 @@ import re
 # https://developer.spotify.com/console/get-playlist/?playlist_id=1s9MirMoT3CDgBNGgMcECL&market=&fields=&additional_types= 
 
 
-TOKEN = input('Spotify Token: ')
-PATH = input('Path: ').replace('/', '\\')
-PLAYLIST_ID = input('Playlist ID: ')
+# TOKEN = input('Spotify Token: ')
+# PATH = input('Path: ').replace('/', '\\')
+# PLAYLIST_ID = input('Playlist ID: ')
 
-songs = []
 
-BASE_URL = 'https://api.spotify.com/v1/'
-HEADERS = {
-    'Authorization': f'Bearer {TOKEN}'}
 
-def get_response(query):
+def get_response(query, token):
+    BASE_URL = 'https://api.spotify.com/v1/'
+    HEADERS = {
+        'Authorization': f'Bearer {token}'}
     url = BASE_URL + query
     response = requests.get(url, headers=HEADERS)
     print_response = json.dumps(response.json(), indent=2)
@@ -38,9 +37,11 @@ def get_response(query):
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def get_playlist_songs(playlist_id):
-    
-    playlist_data = get_response(f'playlists/{playlist_id}')
+def get_playlist_songs(playlist_id, token):
+    songs = []
+    songs_names_and_artists = list()
+
+    playlist_data = get_response(f'playlists/{playlist_id}', token)
     for song in playlist_data['tracks']['items']:
         
         song_name = song['track']['name']
@@ -51,12 +52,15 @@ def get_playlist_songs(playlist_id):
             artists.append(artist['name'])
 
         artist = ', '.join(letra for letra in artists)
+        
+        songs_names_and_artists.append({'song': song_name, 'artist': artist})
         songs.append(song_name + ' ' + artist)
 
+    return songs, songs_names_and_artists
 
 # ------------------------------------
 
-def download_video(link):
+def download_video(link, path):
     yt = YouTube(link, on_progress_callback=on_progress)
     video_title = yt.title
     video_title = [letra for letra in video_title if letra not in '''./$,~´`:*?"'><|''']
@@ -65,21 +69,21 @@ def download_video(link):
     print('Downloading...')
     
     video = yt.streams.get_by_resolution('360p')
-    video.download(output_path=PATH ,filename=video_title + '.mp4')
+    video.download(output_path=path ,filename=video_title + '.mp4')
     
     return video_title
 
 
-def youtube_content_dowloader(link):
+def youtube_content_dowloader(link, path):
     
     print('Converting...')
 
     # Formating the filename and downloading the video
-    filename = download_video(link)
+    filename = download_video(link, path)
 
     # defining the mp3 and mp4 filenames
-    mp4_file = rf"{PATH}\{filename}.mp4"
-    mp3_file = rf'{PATH}\{filename}.mp3'
+    mp4_file = rf"{path}\{filename}.mp4"
+    mp3_file = rf'{path}\{filename}.mp3'
 
     # Converting
     video_clip = VideoFileClip(mp4_file)
@@ -108,28 +112,32 @@ def get_youtube_urls(search_term):
 
         songs_urls.append(url[0])
 
+def scraping_and_downloading_songs(playlist_id, token, path):
+    global songs_scraped
+    global songs_urls
+    songs_scraped = []
+    songs_urls = []
 
-get_playlist_songs(PLAYLIST_ID)
+    songs, songs_names_and_artists = get_playlist_songs(playlist_id, token)
 
-songs_scraped = []
-songs_urls = []
+    for song in songs:
+        x = threading.Thread(target=get_youtube_urls, args=(song,))
+        x.start()
+        while threading.active_count() >= 10:
+            sleep(0.5)
 
-for song in songs:
-    x = threading.Thread(target=get_youtube_urls, args=(song,))
-    x.start()
-    while threading.active_count() >= 5:
-        sleep(0.5)
+    sleep(2)
+    print(len(songs_urls))
 
-sleep(2)
-print(len(songs_urls))
+    for song_url in songs_urls:
+        while True:
+            try:    
+                x = threading.Thread(target=youtube_content_dowloader, args=(song_url, path))
+                x.start()
+                while threading.active_count() >= 10:
+                    sleep(1)
+                break
+            except Exception as e:
+                print('Ocorreu um erro ao baixar a música:', song_url)
 
-for song_url in songs_urls:
-    while True:
-        try:    
-            x = threading.Thread(target=youtube_content_dowloader, args=(song_url,))
-            x.start()
-            while threading.active_count() >= 10:
-                sleep(1)
-            break
-        except Exception as e:
-            print('Ocorreu um erro ao baixar a música:', song_url)
+    return songs, songs_names_and_artists
